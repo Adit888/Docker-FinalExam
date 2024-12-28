@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+
+# Configure LDAP first.
+
+# radius:
+#   image: irasnyd/freeradius-ldap:latest
+#   container_name: radius
+#   ports:
+#     - "1812:1812/udp"
+#     - "1813:1813/udp"
+#   environment:
+#     - "LDAP_HOST=ldap"
+#     - "LDAP_USER=cn=admin,dc=radiushua,dc=com"
+#     - "LDAP_PASS=password123"
+#     - "LDAP_BASEDN=dc=radiushua,dc=com"
+#     - "LDAP_USER_BASEDN=ou=People,dc=radiushua,dc=com"
+#     - "RADIUS_CLIENT_CREDENTIALS=1.2.3.4:password1234,5.6.7.8:password5678"
+#   mem_limit: "1g"
+#   restart: "always"
+
+  ldap:
+    image: osixia/openldap:latest
+    container_name: openldap
+    environment:
+      LDAP_ORGANISATION: "radiushua.com"
+      LDAP_DOMAIN: "radiushua.com"
+      LDAP_ADMIN_PASSWORD: "password123"
+    volumes:
+      - ./ldap/config:/etc/ldap/slapd.d
+      - ./ldap/data:/var/lib/ldap
+    networks:
+      - app_network
+    restart: always
+
+  ldap-admin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "ldap"
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8080:80"
+    networks:
+      - app_network
+    restart: always
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud_user
+      MYSQL_PASSWORD: password123
+    volumes:
+      - ./nextcloud/data:/var/lib/mysql
+    networks:
+      - app_network
+    restart: always
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    environment:
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: password123
+    ports:
+      - "8082:80"
+    volumes:
+      - ./nextcloud/config:/var/www/html/config:rw,uid=33,gid=33
+      - ./nextcloud/data:/var/www/html/data:rw,uid=33,gid=33
+      - ./onlyoffice/documentserver_community:/var/www/html/custom_apps/documentserver_community:rw,uid=33,gid=3
+    depends_on:
+      - mariadb
+    networks:
+      - app_network
+    restart: always
+
+networks:
+  app_network:
+    driver: bridge
